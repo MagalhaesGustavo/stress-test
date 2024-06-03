@@ -15,5 +15,5 @@ go run main.go --url=https://google.com --requests=100 --concurrency=20
 ou
 
 ```
-docker run stress-test --url=https://google.com --requests=100 --concurrency=20
+docker run stress-test --url=http://google.com --concurrency=20 --requests=300
 ```

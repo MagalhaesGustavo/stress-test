@@ -3,8 +3,6 @@ package cmd
 import (
 	"crypto/tls"
 	"fmt"
-	"io"
-	"log"
 	"net/http"
 	"os"
 	"sync"
@@ -95,28 +93,32 @@ func makeRequest(url string, report *Report) {
 	}
 	client := &http.Client{Transport: tr}
 
+	var mutex sync.Mutex
 	resp, err := client.Get(url)
+	if resp == nil{
+		mutex.Lock()
+		report.statusOther[500]++
+		report.totalRequests++
+		mutex.Unlock()
+		return
+	}
 	if err != nil {
-		log.Printf("Error making the request: %v", err)
+		mutex.Lock()
+		report.statusOther[resp.StatusCode]++
+		report.totalRequests++
+		mutex.Unlock()
 		return
 	}
 	defer resp.Body.Close()
 
-	_, err = io.ReadAll(resp.Body)
-	if err != nil {
-		log.Printf("Error reading the response body: %v", err)
-		return
-	}
-
-	var mutex sync.Mutex
 	mutex.Lock()
 	defer mutex.Unlock()
 	report.totalRequests++
 	if resp.StatusCode == http.StatusOK {
 		report.status200++
-	} else {
-		report.statusOther[resp.StatusCode]++
-	}
+		return 
+	}		
+	report.statusOther[resp.StatusCode]++
 }
 
 func printReport(report *Report) {
@@ -125,8 +127,13 @@ func printReport(report *Report) {
 	fmt.Printf("Total execution time: %v\n", report.totalTime)
 	fmt.Printf("Total number of requests made: %d\n", report.totalRequests)
 	fmt.Printf("Number of requests with HTTP status 200: %d\n", report.status200)
-	fmt.Println("Distribution of other HTTP status codes:")
 	for status, count := range report.statusOther {
+		if count == 0{
+			fmt.Println("Distribution of other HTTP status codes: 0")
+			return
+		} else {
+		fmt.Println("Distribution of other HTTP status codes:")
 		fmt.Printf("Status %d: %d requests\n", status, count)
+		}
 	}
 }
